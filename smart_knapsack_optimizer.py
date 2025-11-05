@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 st.set_page_config(page_title="Smart Knapsack Optimizer", layout="wide")
 
@@ -28,7 +27,6 @@ def knapsack_dp(weights, values, capacity):
             c -= weights[i - 1]
 
     return picks, dp[n][capacity]
-
 
 # ------------------------------
 # Greedy Methods
@@ -77,36 +75,64 @@ method = st.radio("Choose Strategy",
     ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"],
     horizontal=True)
 
+
 if st.button("Run Optimization"):
     dp_picks, dp_profit = knapsack_dp(weights, profits, capacity)
     picks, result_profit = (dp_picks, dp_profit) if method == "DP Optimal Solution" else greedy(weights, profits, capacity, method)
 
     st.success(f"✅ Chosen Method: {method}")
-    st.write(f"### 🎯 Selected: `{picks}`")
+    st.write(f"### 🎯 Selected Items: `{picks}`")
     st.write(f"### 💰 Total Profit: `{result_profit}`")
 
-    # Bubble Chart
+    # ---------------- Bubble Chart ----------------
     st.write("### 📍 Weight vs Profit")
     ratios = np.array(profits) / np.array(weights)
     colors = ['green' if picks[i] == 1 else 'gray' for i in range(len(picks))]
-    
-    figb, axb = plt.subplots(figsize=(4.5, 3))
-    axb.scatter(weights, profits, s=ratios*200 + 60, c=colors)
 
+    figb, axb = plt.subplots(figsize=(5, 3))
+    axb.scatter(weights, profits, s=ratios * 200 + 60, c=colors)
+
+    # ✅ Clean label handling for overlapping points
+    existing_positions = {}
     for i in range(item_count):
-        axb.text(weights[i]+0.1, profits[i]+0.1, f"I{i+1}", fontsize=8)
+        pos = (weights[i], profits[i])
+        label = f"I{i+1}"
+        if pos in existing_positions:
+            existing_positions[pos].append(label)
+        else:
+            existing_positions[pos] = [label]
 
+    for pos, labels in existing_positions.items():
+        axb.text(pos[0] + 0.15, pos[1] + 0.15, ", ".join(labels), fontsize=8)
+
+    axb.set_xlabel("Weight")
+    axb.set_ylabel("Profit")
     st.pyplot(figb)
 
-    # Gantt Chart
+    # ---------------- Gantt Chart ----------------
     st.write("### 📦 Gantt Packing Timeline")
-    figg, axg = plt.subplots(figsize=(5, 1.7))
+
+    figg, axg = plt.subplots(figsize=(6, 1.8))
     start = 0
+    segments = {}
+
     for i in range(item_count):
         if picks[i] == 1:
-            axg.barh("Knapsack", weights[i], left=start)
-            axg.text(start + weights[i]/2, 0, f"I{i+1}", color="white", ha='center', va='center', fontsize=8)
-            start += weights[i]
+            length = weights[i]
+            interval = (start, start + length)
+
+            if interval not in segments:
+                segments[interval] = []
+            segments[interval].append(f"I{i+1}")
+
+            start += length
+
+    for (left, right), items in segments.items():
+        width = right - left
+        axg.barh("Knapsack", width, left=left)
+        axg.text(left + width/2, 0, ", ".join(items), color="white",
+                 ha='center', va='center', fontsize=8)
+
     axg.set_xlim(0, capacity)
     st.pyplot(figg)
 
