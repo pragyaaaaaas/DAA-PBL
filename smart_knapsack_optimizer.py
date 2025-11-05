@@ -129,10 +129,7 @@ if st.button("Run Optimization"):
 
     for (left, right), items in segments.items():
         width = right - left
-
-        # ✅ Changed color from yellow to blue
-        axg.barh("Knapsack", width, left=left, color="#3b82f6")
-
+        axg.barh("Knapsack", width, left=left)
         axg.text(left + width/2, 0, ", ".join(items), color="white",
                  ha='center', va='center', fontsize=8)
 
