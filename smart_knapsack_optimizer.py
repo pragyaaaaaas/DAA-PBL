@@ -6,25 +6,6 @@ import seaborn as sns
 
 st.set_page_config(page_title="Smart Knapsack Optimizer", layout="wide")
 
-# Apply Theme
-def set_theme(theme):
-    if theme == "Dark":
-        st.markdown("""
-        <style>
-        body, .stApp { background-color: #0f1116 !important; color: white !important; }
-        .stButton>button { background-color: #1f6feb !important; color: white !important; }
-        </style>
-        """, unsafe_allow_html=True)
-        plt.style.use("dark_background")
-    else:
-        st.markdown("""
-        <style>
-        body, .stApp { background-color: white !important; color: black !important; }
-        .stButton>button { background-color: #0f6ebf !important; color: white !important; }
-        </style>
-        """, unsafe_allow_html=True)
-        plt.style.use("default")
-
 # ------------------------------
 # Knapsack DP
 # ------------------------------
@@ -47,6 +28,7 @@ def knapsack_dp(weights, values, capacity):
             c -= weights[i - 1]
 
     return picks, dp[n][capacity]
+
 
 # ------------------------------
 # Greedy Methods
@@ -72,15 +54,12 @@ def greedy(weights, values, capacity, mode):
 
     return picks, total_p
 
+
 # ---------------- UI Header ----------------
 st.markdown(
 "<h1 style='text-align:center; color:#2e8b57;'>🤖 Smart Knapsack Optimizer</h1>",
 unsafe_allow_html=True
 )
-
-# Theme Toggle
-theme = st.radio("Choose Theme", ["Light", "Dark"], horizontal=True)
-set_theme(theme)
 
 # ---------------- Manual Input ----------------
 st.write("---")
@@ -111,15 +90,17 @@ if st.button("Run Optimization"):
     ratios = np.array(profits) / np.array(weights)
     colors = ['green' if picks[i] == 1 else 'gray' for i in range(len(picks))]
     
-    figb, axb = plt.subplots(figsize=(4.5, 3))  # ↓ Reduced Size
+    figb, axb = plt.subplots(figsize=(4.5, 3))
     axb.scatter(weights, profits, s=ratios*200 + 60, c=colors)
+
     for i in range(item_count):
         axb.text(weights[i]+0.1, profits[i]+0.1, f"I{i+1}", fontsize=8)
+
     st.pyplot(figb)
 
     # Gantt Chart
     st.write("### 📦 Gantt Packing Timeline")
-    figg, axg = plt.subplots(figsize=(5, 1.7))  # ↓ Reduced size
+    figg, axg = plt.subplots(figsize=(5, 1.7))
     start = 0
     for i in range(item_count):
         if picks[i] == 1:
