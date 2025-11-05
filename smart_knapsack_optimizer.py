@@ -30,7 +30,6 @@ def knapsack_dp(weights, values, capacity):
 
     return picks, dp[n][capacity]
 
-
 # ------------------------------
 # Greedy Methods
 # ------------------------------
@@ -38,12 +37,10 @@ def greedy(weights, values, capacity, mode):
     items = list(range(len(weights)))
 
     if mode == "Greedy by Weight":
-        items.sort(key=lambda i: weights[i])  # smaller weight first
-
+        items.sort(key=lambda i: weights[i])
     elif mode == "Greedy by Profit":
         items.sort(key=lambda i: values[i], reverse=True)
-
-    else:  # Profit/Weight
+    else:
         items.sort(key=lambda i: values[i] / weights[i], reverse=True)
 
     total_profit, total_weight = 0, 0
@@ -57,13 +54,11 @@ def greedy(weights, values, capacity, mode):
 
     return picks, total_profit
 
-
 # ---------------- UI ----------------
 st.markdown(
     "<h1 style='text-align:center; color:#2e8b57;'>🤖 Smart Knapsack Optimizer</h1>",
     unsafe_allow_html=True
 )
-st.write("### Upload Dataset")
 
 uploaded = st.file_uploader("Upload `knapsack_5_items.csv`", type=["csv"])
 
@@ -74,19 +69,20 @@ if uploaded:
     df["Best picks"] = df["Best picks"].apply(lambda x: np.array(ast.literal_eval(x)))
 
     st.success("✅ Dataset Loaded Successfully")
-    st.dataframe(df.head())
+    st.write("### Preview")
+    st.dataframe(df)
 
-    st.write("---")
-    st.write("### 🔧 Select Optimization Strategy")
+    st.write("### 🎯 Select Row to Optimize")
+    row_index = st.slider("Choose dataset row", 0, len(df)-1, 0)
+
+    weights = df.iloc[row_index]["Weights"]
+    values = df.iloc[row_index]["Prices"]
+    capacity = df.iloc[row_index]["Capacity"]
 
     mode = st.selectbox("Choose Knapsack Method", 
-                         ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
+                        ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
 
     if st.button("Run Optimization"):
-        weights = df.iloc[0]["Weights"]
-        values = df.iloc[0]["Prices"]
-        capacity = df.iloc[0]["Capacity"]
-
         if mode == "DP Optimal Solution":
             picks, best_profit = knapsack_dp(weights, values, capacity)
         else:
@@ -95,7 +91,7 @@ if uploaded:
         st.write(f"### ✅ Selected: `{picks}`")
         st.write(f"### 💰 Total Profit: `{best_profit}`")
 
-        # --------- Plot Profit & Weight ---------
+        # --------- Profit & Weight Charts ---------
         st.write("### 📊 Item Profit & Weight Chart")
         fig, ax = plt.subplots(1, 2, figsize=(10, 4))
 
@@ -107,7 +103,7 @@ if uploaded:
 
         st.pyplot(fig)
 
-        # -------- Heatmap for Profit/Weight Ratio --------
+        # -------- Heatmap for Profit-to-Weight --------
         ratios = np.array(values) / np.array(weights)
         st.write("### 🔥 Profit-to-Weight Importance Heatmap")
         fig2, ax2 = plt.subplots(figsize=(4,2))
@@ -124,7 +120,6 @@ capacity = st.slider("Knapsack Capacity", 10, 200, 60)
 weights = []
 profits = []
 
-st.write("### Adjust Item Properties")
 for i in range(item_count):
     w = st.slider(f"Weight of Item {i+1}", 1, 50, 10)
     p = st.slider(f"Profit of Item {i+1}", 1, 100, 20)
@@ -132,7 +127,7 @@ for i in range(item_count):
     profits.append(p)
 
 method = st.radio("Choose Strategy", 
-                   ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
+                  ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
 
 if st.button("Solve Custom Case"):
     if method == "DP Optimal Solution":
@@ -142,7 +137,6 @@ if st.button("Solve Custom Case"):
 
     st.write(f"### ✅ Selected Items: `{picks}`")
     st.write(f"### 💰 Max Profit: `{val}`")
-
 
 # ---------------- Footer ----------------
 st.write("---")
