@@ -5,17 +5,15 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-st.set_page_config(page_title="Smart Knapsack Optimizer", layout="wide")
-
+# ------------------------------ 
+# 0/1 Knapsack DP 
 # ------------------------------
-# 0/1 Knapsack DP
-# ------------------------------
-def knapsack_dp(weights, values, capacity):
+def knapsack(weights, values, capacity):
     n = len(weights)
     dp = np.zeros((n+1, capacity+1), dtype=int)
 
     for i in range(1, n+1):
-        for c in range(capacity + 1):
+        for c in range(capacity+1):
             if weights[i-1] <= c:
                 dp[i][c] = max(dp[i-1][c], values[i-1] + dp[i-1][c-weights[i-1]])
             else:
@@ -28,116 +26,100 @@ def knapsack_dp(weights, values, capacity):
             picks[i-1] = 1
             c -= weights[i-1]
 
-    return picks, dp[n][capacity]
+    return picks, dp[n][capacity], dp
 
 # ------------------------------
-# Greedy Methods
+# Streamlit UI
 # ------------------------------
-def greedy(weights, values, capacity, mode):
-    items = list(range(len(weights)))
 
-    if mode == "Greedy by Weight":
-        items.sort(key=lambda i: weights[i])
-    elif mode == "Greedy by Profit":
-        items.sort(key=lambda i: values[i], reverse=True)
-    else:
-        items.sort(key=lambda i: values[i] / weights[i], reverse=True)
-
-    total_profit, total_weight = 0, 0
-    picks = np.zeros(len(weights), int)
-
-    for i in items:
-        if total_weight + weights[i] <= capacity:
-            picks[i] = 1
-            total_weight += weights[i]
-            total_profit += values[i]
-
-    return picks, total_profit
-
-# ---------------- UI ----------------
-st.markdown(
-    "<h1 style='text-align:center; color:#2e8b57;'>🤖 Smart Knapsack Optimizer</h1>",
-    unsafe_allow_html=True
-)
+st.markdown("<h1 style='text-align:center;'>🎒 Knapsack Optimization — Feature Selection Style Demo</h1>", unsafe_allow_html=True)
 
 uploaded = st.file_uploader("Upload `knapsack_5_items.csv`", type=["csv"])
 
 if uploaded:
     df = pd.read_csv(uploaded)
+
     df["Weights"] = df["Weights"].apply(lambda x: ast.literal_eval(x))
     df["Prices"] = df["Prices"].apply(lambda x: ast.literal_eval(x))
     df["Best picks"] = df["Best picks"].apply(lambda x: np.array(ast.literal_eval(x)))
 
-    st.success("✅ Dataset Loaded Successfully")
+    st.success("✅ Dataset loaded successfully")
     st.write("### Preview")
-    st.dataframe(df)
+    st.dataframe(df.head())
 
-    st.write("### 🎯 Select Row to Optimize")
-    row_index = st.slider("Choose dataset row", 0, len(df)-1, 0)
+    # Graph 1 — total weights vs total prices
+    st.write("### 📊 Dataset Summary Plot")
 
-    weights = df.iloc[row_index]["Weights"]
-    values = df.iloc[row_index]["Prices"]
-    capacity = df.iloc[row_index]["Capacity"]
+    df["Total Weight"] = df["Weights"].apply(sum)
+    df["Total Price"] = df["Prices"].apply(sum)
 
-    mode = st.selectbox("Choose Knapsack Method", 
-                        ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
+    fig, ax = plt.subplots()
+    ax.scatter(df["Total Weight"], df["Total Price"])
+    ax.set_xlabel("Total Weight")
+    ax.set_ylabel("Total Price")
+    ax.set_title("Weight vs Price Distribution")
+    st.pyplot(fig)
 
-    if st.button("Run Optimization"):
-        if mode == "DP Optimal Solution":
-            picks, best_profit = knapsack_dp(weights, values, capacity)
-        else:
-            picks, best_profit = greedy(weights, values, capacity, mode)
+    if st.button("Run Knapsack Evaluation"):
+        correct = 0
+        predictions = []
+        
+        heatmaps = []
 
-        st.write(f"### ✅ Selected: `{picks}`")
-        st.write(f"### 💰 Total Profit: `{best_profit}`")
+        for idx, row in df.iterrows():
+            pred_picks, pred_value, dp = knapsack(row["Weights"], row["Prices"], row["Capacity"])
+            predictions.append(pred_picks.tolist())
 
-        # --------- Profit & Weight Charts ---------
-        st.write("### 📊 Item Profit & Weight Chart")
-        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+            heatmaps.append(dp)
+            if np.array_equal(pred_picks, row["Best picks"]):
+                correct += 1
 
-        ax[0].bar(range(len(values)), values)
-        ax[0].set_title("Profit per Item")
+        df["Predicted picks"] = predictions
+        accuracy = correct / len(df)
 
-        ax[1].bar(range(len(weights)), weights)
-        ax[1].set_title("Weight per Item")
+        st.write("### ✅ Results")
+        st.write(f"### 🎯 Accuracy vs Provided Optimal: **{accuracy*100:.2f}%**")
+        st.dataframe(df.head())
 
-        st.pyplot(fig)
-
-        # -------- Heatmap for Profit-to-Weight --------
-        ratios = np.array(values) / np.array(weights)
-        st.write("### 🔥 Profit-to-Weight Importance Heatmap")
-        fig2, ax2 = plt.subplots(figsize=(4,2))
-        sns.heatmap([ratios], cmap="viridis", annot=True, ax=ax2)
+        # DP heatmap for first item
+        st.write("### 🔥 Dynamic Programming Matrix Heatmap (first test)")
+        fig2, ax2 = plt.subplots()
+        sns.heatmap(heatmaps[0], cmap="viridis", ax=ax2)
         st.pyplot(fig2)
 
-# ---------------- Manual Input ----------------
+        st.download_button(
+            "📥 Download Results CSV",
+            df.to_csv(index=False),
+            file_name="knapsack_results.csv"
+        )
+
+# ------------------------------
+# Manual Test Section
+# ------------------------------
+
 st.write("---")
-st.subheader("🧪 Try Your Own Items")
+st.write("### 🧪 Try Your Own Input")
 
-item_count = st.slider("Number of items", 1, 10, 5)
-capacity = st.slider("Knapsack Capacity", 10, 200, 60)
+num_items = st.number_input("Number of items", 1, 10, 5)
+weights = st.text_input("Enter weights (comma-separated)", "10,20,30,40,50")
+prices = st.text_input("Enter prices (comma-separated)", "5,7,10,15,20")
+capacity = st.number_input("Capacity", 1, 200, 60)
 
-weights = []
-profits = []
+if st.button("Solve Custom Knapsack"):
+    W = list(map(int, weights.split(",")))
+    P = list(map(int, prices.split(",")))
 
-for i in range(item_count):
-    w = st.slider(f"Weight of Item {i+1}", 1, 50, 10)
-    p = st.slider(f"Profit of Item {i+1}", 1, 100, 20)
-    weights.append(w)
-    profits.append(p)
+    picks, value, dp = knapsack(W, P, capacity)
 
-method = st.radio("Choose Strategy", 
-                  ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"])
+    st.write(f"### 🎒 Selected Items: `{picks}`")
+    st.write(f"### 💰 Total Value: `{value}`")
 
-if st.button("Solve Custom Case"):
-    if method == "DP Optimal Solution":
-        picks, val = knapsack_dp(weights, profits, capacity)
-    else:
-        picks, val = greedy(weights, profits, capacity, method)
+    # Visualize DP matrix
+    st.write("#### 🔍 DP Table Visualization")
+    fig3, ax3 = plt.subplots()
+    sns.heatmap(dp, cmap="magma", ax=ax3)
+    st.pyplot(fig3)
 
-    st.write(f"### ✅ Selected Items: `{picks}`")
-    st.write(f"### 💰 Max Profit: `{val}`")
-
-# ---------------- Footer ----------------
+# Footer
 st.write("---")
-st.markdown("<h4 style='text-align:center; color:#ff0080;'>✨ Made by <b>Pragya Srivastava</b> ✨</h4>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align:center;'>Made by Pragya Srivastava</h4>", unsafe_allow_html=True)
