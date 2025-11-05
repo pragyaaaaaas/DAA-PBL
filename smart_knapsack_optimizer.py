@@ -6,6 +6,25 @@ import seaborn as sns
 
 st.set_page_config(page_title="Smart Knapsack Optimizer", layout="wide")
 
+# Apply Theme
+def set_theme(theme):
+    if theme == "Dark":
+        st.markdown("""
+        <style>
+        body, .stApp { background-color: #0f1116 !important; color: white !important; }
+        .stButton>button { background-color: #1f6feb !important; color: white !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        plt.style.use("dark_background")
+    else:
+        st.markdown("""
+        <style>
+        body, .stApp { background-color: white !important; color: black !important; }
+        .stButton>button { background-color: #0f6ebf !important; color: white !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        plt.style.use("default")
+
 # ------------------------------
 # Knapsack DP
 # ------------------------------
@@ -61,12 +80,7 @@ unsafe_allow_html=True
 
 # Theme Toggle
 theme = st.radio("Choose Theme", ["Light", "Dark"], horizontal=True)
-if theme == "Dark":
-    st.markdown("""
-        <style>
-            body, .css-18e3th9 { background-color: #0f1116 !important; color:white }
-        </style>
-    """, unsafe_allow_html=True)
+set_theme(theme)
 
 # ---------------- Manual Input ----------------
 st.write("---")
@@ -81,52 +95,36 @@ for i in range(item_count):
     profits.append(st.slider(f"Profit of Item {i+1}", 1, 100, 20, key=f"p{i}"))
 
 method = st.radio("Choose Strategy", 
-                  ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"],
-                  horizontal=True)
+    ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"],
+    horizontal=True)
 
 if st.button("Run Optimization"):
-    # Compute results
     dp_picks, dp_profit = knapsack_dp(weights, profits, capacity)
     picks, result_profit = (dp_picks, dp_profit) if method == "DP Optimal Solution" else greedy(weights, profits, capacity, method)
 
-    # Results
     st.success(f"✅ Chosen Method: {method}")
     st.write(f"### 🎯 Selected: `{picks}`")
     st.write(f"### 💰 Total Profit: `{result_profit}`")
-
-    # Comparison Bar Chart
-    greedy_w = greedy(weights, profits, capacity, "Greedy by Weight")[1]
-    greedy_p = greedy(weights, profits, capacity, "Greedy by Profit")[1]
-    greedy_ratio = greedy(weights, profits, capacity, "Greedy by Profit/Weight")[1]
-
-    comp_df = pd.DataFrame({
-        "Method": ["DP", "Greedy-Weight", "Greedy-Profit", "Greedy-Ratio"],
-        "Profit": [dp_profit, greedy_w, greedy_p, greedy_ratio]
-    })
-
-    st.write("### 📊 Profit Comparison Chart")
-    figc, axc = plt.subplots()
-    axc.bar(comp_df.Method, comp_df.Profit)
-    st.pyplot(figc)
 
     # Bubble Chart
     st.write("### 📍 Weight vs Profit")
     ratios = np.array(profits) / np.array(weights)
     colors = ['green' if picks[i] == 1 else 'gray' for i in range(len(picks))]
-    figb, axb = plt.subplots()
-    axb.scatter(weights, profits, s=ratios*260 + 80, c=colors)
+    
+    figb, axb = plt.subplots(figsize=(4.5, 3))  # ↓ Reduced Size
+    axb.scatter(weights, profits, s=ratios*200 + 60, c=colors)
     for i in range(item_count):
-        axb.text(weights[i]+0.2, profits[i]+0.2, f"I{i+1}")
+        axb.text(weights[i]+0.1, profits[i]+0.1, f"I{i+1}", fontsize=8)
     st.pyplot(figb)
 
     # Gantt Chart
     st.write("### 📦 Gantt Packing Timeline")
-    figg, axg = plt.subplots(figsize=(7,2))
+    figg, axg = plt.subplots(figsize=(5, 1.7))  # ↓ Reduced size
     start = 0
     for i in range(item_count):
         if picks[i] == 1:
             axg.barh("Knapsack", weights[i], left=start)
-            axg.text(start+weights[i]/2, 0, f"I{i+1}", color="white", va='center', ha='center')
+            axg.text(start + weights[i]/2, 0, f"I{i+1}", color="white", ha='center', va='center', fontsize=8)
             start += weights[i]
     axg.set_xlim(0, capacity)
     st.pyplot(figg)
