@@ -2,116 +2,155 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import plotly.express as px
-from io import StringIO
+import seaborn as sns
 
-# ----------------- Page Config -----------------
 st.set_page_config(page_title="Smart Knapsack Optimizer", layout="wide")
 
-# ----------------- Theme Toggle -----------------
-mode = st.radio("Theme Mode:", ["🌙 Dark", "☀️ Light"], horizontal=True)
-
-if mode == "🌙 Dark":
-    st.markdown("""
+# Apply Theme
+def set_theme(theme):
+    if theme == "Dark":
+        st.markdown("""
         <style>
-            body { background-color: #0E1117; color: white; }
+        body, .stApp { background-color: #0f1116 !important; color: white !important; }
+        .stButton>button { background-color: #1f6feb !important; color: white !important; }
         </style>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
+        """, unsafe_allow_html=True)
+        plt.style.use("dark_background")
+    else:
+        st.markdown("""
         <style>
-            body { background-color: #FFFFFF; color: black; }
+        body, .stApp { background-color: white !important; color: black !important; }
+        .stButton>button { background-color: #0f6ebf !important; color: white !important; }
         </style>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        plt.style.use("default")
 
-# ----------------- Heading -----------------
-st.markdown("<h1 style='text-align:center;'>Smart Knapsack Optimizer 🤖</h1>", unsafe_allow_html=True)
+# ------------------------------
+# Knapsack DP
+# ------------------------------
+def knapsack_dp(weights, values, capacity):
+    n = len(weights)
+    dp = np.zeros((n + 1, capacity + 1), dtype=int)
 
-# ----------------- Dataset -----------------
-data = {
-    "Item": ["A", "B", "C", "D", "E"],
-    "Profit": [60, 100, 120, 90, 30],
-    "Weight": [10, 20, 30, 15, 5]
-}
-df = pd.DataFrame(data)
-df["Profit/Weight"] = (df["Profit"] / df["Weight"]).round(2)
+    for i in range(1, n + 1):
+        for c in range(capacity + 1):
+            if weights[i - 1] <= c:
+                dp[i][c] = max(dp[i - 1][c], values[i - 1] + dp[i - 1][c - weights[i - 1]])
+            else:
+                dp[i][c] = dp[i - 1][c]
 
-# Sidebar capacity slider
-capacity = st.sidebar.slider("Knapsack Capacity", 10, 100, 50)
+    picks = np.zeros(n, dtype=int)
+    c = capacity
+    for i in range(n, 0, -1):
+        if dp[i][c] != dp[i - 1][c]:
+            picks[i - 1] = 1
+            c -= weights[i - 1]
 
-criterion = st.sidebar.radio("Select Optimization Strategy",
-                             ["Greedy: Max Profit", "Greedy: Min Weight", "Greedy: Profit/Weight"])
+    return picks, dp[n][capacity]
 
-# ----------------- Knapsack Logic -----------------
-df_sorted = df.copy()
-if criterion == "Greedy: Max Profit":
-    df_sorted = df.sort_values(by="Profit", ascending=False)
-elif criterion == "Greedy: Min Weight":
-    df_sorted = df.sort_values(by="Weight")
-else:
-    df_sorted = df.sort_values(by="Profit/Weight", ascending=False)
+# ------------------------------
+# Greedy Methods
+# ------------------------------
+def greedy(weights, values, capacity, mode):
+    items = list(range(len(weights)))
 
-selected_items = []
-total_profit = 0
-total_weight = 0
+    if mode == "Greedy by Weight":
+        items.sort(key=lambda x: weights[x])
+    elif mode == "Greedy by Profit":
+        items.sort(key=lambda x: values[x], reverse=True)
+    else:
+        items.sort(key=lambda x: values[x] / weights[x], reverse=True)
 
-for _, row in df_sorted.iterrows():
-    if total_weight + row["Weight"] <= capacity:
-        selected_items.append(row["Item"])
-        total_profit += row["Profit"]
-        total_weight += row["Weight"]
+    picks = np.zeros(len(weights), int)
+    total_w, total_p = 0, 0
 
-# ----------------- Results -----------------
-st.subheader("Selected Items")
-st.write(", ".join(selected_items) if selected_items else "No items selected")
+    for i in items:
+        if total_w + weights[i] <= capacity:
+            picks[i] = 1
+            total_w += weights[i]
+            total_p += values[i]
 
-st.metric("📦 Total Weight", total_weight)
-st.metric("💰 Total Profit", total_profit)
+    return picks, total_p
 
-# ----------------- Bubble Plot -----------------
-st.subheader("📊 Profit vs Weight Bubble Chart")
+# ---------------- UI Header ----------------
+st.markdown(
+"<h1 style='text-align:center; color:#2e8b57;'>🤖 Smart Knapsack Optimizer</h1>",
+unsafe_allow_html=True
+)
 
-fig = px.scatter(df, x="Weight", y="Profit", size="Profit", text="Item")
-fig.update_traces(textposition="top right")  # Keep labels close
-fig.update_layout(height=380)
-st.plotly_chart(fig, use_container_width=True)
+# Theme Toggle
+theme = st.radio("Choose Theme", ["Light", "Dark"], horizontal=True)
+set_theme(theme)
 
-# ----------------- Gantt Chart -----------------
-st.subheader("⏱ Gantt Chart - Item Timeline (Sequential fill)")
+# ---------------- Manual Input ----------------
+st.write("---")
+st.subheader("📦 Enter Your Items")
 
-gantt = pd.DataFrame({
-    "Task": selected_items,
-    "Start": np.cumsum([0] + [df[df["Item"] == i]["Weight"].values[0] for i in selected_items[:-1]]),
-})
+item_count = st.slider("Number of items", 1, 10, 5)
+capacity = st.slider("Knapsack Capacity", 10, 200, 60)
 
-gantt["Finish"] = gantt["Start"] + [df[df["Item"] == i]["Weight"].values[0] for i in selected_items]
+weights, profits = [], []
+for i in range(item_count):
+    weights.append(st.slider(f"Weight of Item {i+1}", 1, 50, 10, key=f"w{i}"))
+    profits.append(st.slider(f"Profit of Item {i+1}", 1, 100, 20, key=f"p{i}"))
 
-fig2 = px.timeline(gantt, x_start="Start", x_end="Finish", y="Task")
-fig2.update_layout(height=350)
-st.plotly_chart(fig2, use_container_width=True)
+method = st.radio("Choose Strategy", 
+    ["DP Optimal Solution", "Greedy by Weight", "Greedy by Profit", "Greedy by Profit/Weight"],
+    horizontal=True)
 
-# ----------------- Download Results -----------------
-st.subheader("⬇️ Download Results")
+if st.button("Run Optimization"):
+    dp_picks, dp_profit = knapsack_dp(weights, profits, capacity)
+    picks, result_profit = (dp_picks, dp_profit) if method == "DP Optimal Solution" else greedy(weights, profits, capacity, method)
 
-result_csv = StringIO()
-result_data = pd.DataFrame({
-    "Selected Items": [", ".join(selected_items)],
-    "Total Profit": [total_profit],
-    "Total Weight": [total_weight]
-})
-result_data.to_csv(result_csv, index=False)
+    st.success(f"✅ Chosen Method: {method}")
+    st.write(f"### 🎯 Selected: `{picks}`")
+    st.write(f"### 💰 Total Profit: `{result_profit}`")
 
-st.download_button("Download Results CSV", result_csv.getvalue(), "knapsack_results.csv")
+    # Bubble Chart
+    st.write("### 📍 Weight vs Profit")
+    ratios = np.array(profits) / np.array(weights)
+    colors = ['green' if picks[i] == 1 else 'gray' for i in range(len(picks))]
+    
+    figb, axb = plt.subplots(figsize=(4.5, 3))  # ↓ Reduced Size
+    axb.scatter(weights, profits, s=ratios*200 + 60, c=colors)
+    for i in range(item_count):
+        axb.text(weights[i]+0.1, profits[i]+0.1, f"I{i+1}", fontsize=8)
+    st.pyplot(figb)
 
-# ----------------- Footer -----------------
+    # Gantt Chart
+    st.write("### 📦 Gantt Packing Timeline")
+    figg, axg = plt.subplots(figsize=(5, 1.7))  # ↓ Reduced size
+    start = 0
+    for i in range(item_count):
+        if picks[i] == 1:
+            axg.barh("Knapsack", weights[i], left=start)
+            axg.text(start + weights[i]/2, 0, f"I{i+1}", color="white", ha='center', va='center', fontsize=8)
+            start += weights[i]
+    axg.set_xlim(0, capacity)
+    st.pyplot(figg)
+
+    # ✅ Download Results
+    result_df = pd.DataFrame({
+        "Item": [f"I{i+1}" for i in range(item_count)],
+        "Weight": weights,
+        "Profit": profits,
+        "Selected": picks
+    })
+
+    st.download_button(
+        "📥 Download Result CSV",
+        result_df.to_csv(index=False),
+        file_name="knapsack_result.csv",
+        mime="text/csv"
+    )
+
+# ---------------- Footer ------------------
 st.markdown("""
 <br><hr>
 <div style='text-align:center;'>
-<span style='font-size:28px;'>🤖</span><br>
-<b style='font-size:18px;'>Smart Knapsack Optimizer</b><br>
-<span style='font-size:16px;'>Developed by Pragya Srivastava</span><br>
-<p style='font-size:14px;'>
-© 2025, GrowWise — AI powered Smart Knapsack Optimizer
-</p>
+<span style='font-size:50px;'>🤖</span><br>
+<b style='font-size:20px;'>Smart Knapsack Optimizer</b><br>
+<span style='font-size:17px;'>Developed by <b>Pragya Srivastava</b></span><br>
+<p style='font-size:14px;'>© 2025, GrowWise — AI powered Smart Knapsack Optimizer</p>
 </div>
 """, unsafe_allow_html=True)
